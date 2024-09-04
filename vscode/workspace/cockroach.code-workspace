@@ -1,0 +1,48 @@
+{
+	"folders": [
+		{
+			"path": "../../../cockroach"
+		},
+		{
+			"path": "../../../pebble"
+		},
+		{
+			"path": "../.."
+		}
+	],
+	"settings": {
+		"tlaplus.java.home": "/opt/jdk-21.0.4+7",
+		"tlaplus.java.options": "-cp /home/xiaochen/Downloads/CommunityModules-deps.jar",
+		"go.formatTool": "gofmt",
+		"go.formatFlags": [
+			// for gofmt, "-s" means to simplify code
+			"-s",
+		],
+	},
+	"extensions": {
+		"recommendations": [
+			"github.copilot",
+			"golang.go",
+			"bazelbuild.vscode-bazel",
+			"eamodio.gitlens",
+			"github.vscode-pull-request-github",
+			"xiaochencui.copy-github-link",
+			"zxh404.vscode-proto3",
+			"tlaplus.vscode-ide",
+			"foxundermoon.shell-format"
+		],
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "(go) run current file",
+				"type": "go",
+				"request": "launch",
+				"mode": "auto",
+				// current file
+				"program": "${file}",
+			},
+		]
+	},
+}

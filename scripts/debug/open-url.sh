@@ -5,6 +5,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# This script should be run on the laptop.
+# 
 # example usage:
 # ./scripts/debug/open-url.sh
 # fetch file "out" from the remote server, and open all the URLs in the file
