@@ -17,7 +17,7 @@ import requests
 
 # Constants
 REPO_URL = "https://github.com/cockroachdb/cockroach.git"
-WORK_DIR_BASE = "/tmp/cockroach-"
+WORK_DIR_BASE = "/media/xiaochen/large/ci/cockroach/pr-"
 BAZEL_CONFIG = os.path.expanduser("~/code/cockroach/.bazelrc.user")
 
 
