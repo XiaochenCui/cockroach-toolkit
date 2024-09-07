@@ -5,7 +5,6 @@
 #
 # This script pull a PR from cockroachdb/cockroach and run the following checks:
 # - ./dev gen
-# - ./dev build
 # - ./dev lint
 # - ./dev test
 
@@ -16,8 +15,8 @@ import shutil
 import time
 import requests
 
-# Constants
 REPO_URL = "https://github.com/cockroachdb/cockroach.git"
+# use HDD to prevent SSD wear
 WORK_DIR_BASE = "/media/xiaochen/large/ci/cockroach/pr-"
 BAZEL_CONFIG = os.path.expanduser("~/code/cockroach/.bazelrc.user")
 
@@ -104,13 +103,18 @@ def main(pr_number):
     commands = {
         "doctor": "./dev doctor",
         "gen": "./dev gen",
-        # "build": "./dev build",
         "lint": "./dev lint",
-        "test": "./dev test --ignore-cache",
+        "test": "./dev test",
     }
 
     logs = {}
     for step, command in commands.items():
+        if step == "test":
+            target = """err := d.exec.CommandContextInheritingStdStreams(ctx, "bazel", args...)"""
+            insert = """args = append(args, "--experimental_remote_cache_eviction_retries=3")"""
+            file_path = os.path.join(code_dir, "pkg/cmd/dev/test.go")
+            insert_string_before_line(file_path, target, insert)
+
         log_file = f"{log_dir}/{step}.log"
         logs[step] = log_file
         if run_command(command, log_file) != 0:
@@ -123,49 +127,63 @@ def main(pr_number):
     for step, log_file in logs.items():
         match step:
             case "test":
-                print(f"=== summary of {step} start ===")
-                with open(log_file, "r") as file:
-                    output = file.read()
-                    error_lines = [
-                        line
-                        for line in output
-                        if "error" in line.lower() or "failed" in line.lower()
-                    ]
-                    if error_lines:
-                        print("".join(error_lines))
-                print(f"=== summary of {step} end ===")
+                keywords = [
+                    "ERROR",
+                    "FAILED TO BUILD",
+                ]
+                analyaze_test_log(log_file, keywords)
             case _:
                 continue
 
-        with open(log_file, "r") as file:
-            output = file.read()
-            if "error" in output.lower() or "failed" in output.lower():
-                print(f"Summary of {step}: Failed - see {log_file} for details.")
-            else:
-                print(f"Summary of {step}: Success")
 
-
-def print_log(log_file):
-    with open(log_file, "r") as file:
-        lines = file.readlines()
-        error_lines = [
-            line
-            for line in lines
-            if "error" in line.lower() or "failed" in line.lower()
-        ]
-        if error_lines:
-            print("".join(error_lines))
-
-
-def print_log(log_file: str, keywords: list[str]):
+def analyaze_test_log(log_file: str, keywords: list[str]):
+    print(f"=== log file <{log_file}> start ===")
     with open(log_file, "r") as file:
         lines = file.readlines()
 
         for keyword in keywords:
+            print(f"=== {keyword} ===")
             # Filter lines that contain any of the keywords
             error_lines = [line for line in lines if keyword in line]
             if error_lines:
                 print("".join(error_lines))
+
+        # get the number of lines that contain "NO STATUS"
+        print("=== NO STATUS ===")
+        no_status_lines = [line for line in lines if "NO STATUS" in line]
+        print("number of <NO STATUS> tests:", len(no_status_lines))
+
+    print(f"=== log file <{log_file}> end ===")
+
+
+def insert_string_before_line(file_path, target_line_content, string_to_insert):
+    """
+    Inserts a string at the beginning of a line with the exact content match in a file.
+
+    Args:
+        file_path (str): The path to the file.
+        target_line_content (str): The exact content of the line where the string should be inserted before.
+        string_to_insert (str): The string to insert at the beginning of the specified line.
+    """
+    # Read the existing file content
+    with open(file_path, "r") as file:
+        lines = file.readlines()
+
+    # Find and modify the target line
+    modified = False
+    for i, line in enumerate(lines):
+        if line.strip() == target_line_content:
+            lines[i] = string_to_insert + "\n" + line
+            modified = True
+            break
+
+    if not modified:
+        print(f"Error: Line with content '{target_line_content}' not found.")
+        return
+
+    # Write the modified content back to the file
+    with open(file_path, "w") as file:
+        file.writelines(lines)
 
 
 if __name__ == "__main__":
