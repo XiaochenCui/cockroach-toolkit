@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
 
 import os
-from pathlib import Path
 import shutil
+import sys
+
+COCKROACH_SRC_PATH = os.path.expanduser("~/code/cockroach")
+TOOLKIT_PATH = os.path.expanduser("~/code/cockroach-toolkit")
 
 
-COCKROACH_SRC_PATH = os.path.expanduser("~/code/cockroach/")
-
-
-def patch_all_files():
-    directory = "./scaffold-code"
-
+def patch_all_files(mode: str):
+    directory = os.path.join(TOOLKIT_PATH, "scaffold-code")
     for entry in os.listdir(directory):
         path = os.path.join(directory, entry)
         if os.path.isfile(path):
-            patch_file(path)
+            patch_file(path, mode=mode)
 
 
-def patch_file(file_path):
+def patch_file(file_path, mode: str):
     # step 1: extract target location
     #
     # Extract the target location from the first line.
@@ -35,9 +34,20 @@ def patch_file(file_path):
 
     # step 2: copy the file to the target location
     target_location = os.path.join(COCKROACH_SRC_PATH, target_location)
-    shutil.copy(file_path, target_location)
-    print(f"File copied to {target_location}")
+    match mode:
+        case "on":
+            shutil.copy(file_path, target_location)
+            print(f"File copied to {target_location}")
+        case "off":
+            os.remove(target_location)
+            print(f"File removed from {target_location}")
 
 
 if __name__ == "__main__":
-    patch_all_files()
+    # the first argument is the mode
+    if len(sys.argv) != 2:
+        print("Usage: turn-debug.py <on|off>")
+        sys.exit(1)
+
+    mode = sys.argv[1]
+    patch_all_files(mode)

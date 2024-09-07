@@ -7,8 +7,13 @@ set -o nounset
 # we have to continue even if some commands fail
 # set -o pipefail
 
-WORK_DIR=$HOME/code/cockraoch
-cd $WORK_DIR
+COCKROACH_SRC_DIR=$HOME/code/cockraoch
+TOOLKIT_DIR=$HOME/code/cookroach-toolkit
+
+cd $COCKROACH_SRC_DIR
+
+# remove scaffold files
+$TOOLKIT_DIR/scripts/debug/turn-debug.py off
 
 # get the list of files that have been changed
 CHANGED_FILES=$(git diff --name-only upstream/master)
