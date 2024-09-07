@@ -13,6 +13,7 @@ import os
 import sys
 import subprocess
 import shutil
+import time
 import requests
 
 # Constants
@@ -21,12 +22,24 @@ WORK_DIR_BASE = "/media/xiaochen/large/ci/cockroach/pr-"
 BAZEL_CONFIG = os.path.expanduser("~/code/cockroach/.bazelrc.user")
 
 
+# Skip the actual command execution, only analyze the logs
+DRY_RUN = False
+
+
 def run_command(command, log_file):
+    if DRY_RUN:
+        print(f"DRY_RUN: {command}")
+        return 0
+
+    start_time = time.time()
+    print(f"Running command: {command}, log file: {log_file}")
     with open(log_file, "w") as file:
         process = subprocess.Popen(
             command, shell=True, stdout=file, stderr=subprocess.STDOUT
         )
         process.communicate()
+    duration = time.time() - start_time
+    print(f"Command finished in {duration:.2f} seconds.")
     return process.returncode
 
 
@@ -47,44 +60,58 @@ def main(pr_number):
 
     # Step 2: Clone the repo at the PR to a temp directory
     work_dir = f"{WORK_DIR_BASE}{pr_number}"
-    if os.path.exists(work_dir):
-        shutil.rmtree(work_dir)
-    os.makedirs(work_dir)
-    os.makedirs(f"{work_dir}/code")
-    os.makedirs(f"{work_dir}/log")
+    code_dir = f"{work_dir}/code"
+    log_dir = f"{work_dir}/log"
 
-    clone_command = f"git clone {REPO_URL} {work_dir}/code"
-    if run_command(clone_command, f"{work_dir}/log/clone.log") != 0:
+    if not DRY_RUN:
+        if os.path.exists(work_dir):
+            shutil.rmtree(work_dir)
+        os.makedirs(work_dir)
+
+        os.makedirs(f"{code_dir}")
+
+        os.makedirs(f"{log_dir}")
+
+    # clone the pr directly will cause the error:
+    # fatal: Remote branch pull/127584/head not found in upstream origin
+    #
+    # clone_command = f"git clone --depth 1 --branch pull/{pr_number}/head {REPO_URL} {code_dir}"
+
+    clone_command = f"git clone --depth 1 --branch master {REPO_URL} {code_dir}"
+    if run_command(clone_command, f"{log_dir}/clone.log") != 0:
         print(f"Error: Failed to clone the repository.")
         sys.exit(1)
 
-    os.chdir(work_dir)
+    os.chdir(code_dir)
 
-    fetch_command = f"git fetch master pull/{pr_number}/head:pr-{pr_number}"
+    fetch_command = f"git fetch origin pull/{pr_number}/head:pr-{pr_number}"
     checkout_command = f"git checkout pr-{pr_number}"
 
     if (
-        run_command(fetch_command, f"{work_dir}/log/fetch.log") != 0
-        or run_command(checkout_command, f"{work_dir}/log/checkout.log") != 0
+        run_command(fetch_command, f"{log_dir}/fetch.log") != 0
+        or run_command(checkout_command, f"{log_dir}/checkout.log") != 0
     ):
-        print(f"Error: Failed to checkout PR #{pr_number}.")
+        print(
+            f"Error: Failed to checkout PR #{pr_number}, see here for details: {log_dir}/fetch.log and {log_dir}/checkout.log"
+        )
         sys.exit(1)
 
     # Step 3: Copy Bazel config to the work dir
-    bazel_config_dest = os.path.join(work_dir, os.path.basename(BAZEL_CONFIG))
+    bazel_config_dest = os.path.join(code_dir, os.path.basename(BAZEL_CONFIG))
     shutil.copy(BAZEL_CONFIG, bazel_config_dest)
 
     # Step 4: Run the required commands
     commands = {
+        "doctor": "./dev doctor",
         "gen": "./dev gen",
-        "build": "./dev build",
+        # "build": "./dev build",
         "lint": "./dev lint",
-        "test": "./dev test",
+        "test": "./dev test --ignore-cache",
     }
 
     logs = {}
     for step, command in commands.items():
-        log_file = f"{work_dir}/{step}.log"
+        log_file = f"{log_dir}/{step}.log"
         logs[step] = log_file
         if run_command(command, log_file) != 0:
             print(f"Error: {step} failed, see {log_file} for details.")
@@ -94,12 +121,51 @@ def main(pr_number):
 
     # Step 5: Summarize the output
     for step, log_file in logs.items():
+        match step:
+            case "test":
+                print(f"=== summary of {step} start ===")
+                with open(log_file, "r") as file:
+                    output = file.read()
+                    error_lines = [
+                        line
+                        for line in output
+                        if "error" in line.lower() or "failed" in line.lower()
+                    ]
+                    if error_lines:
+                        print("".join(error_lines))
+                print(f"=== summary of {step} end ===")
+            case _:
+                continue
+
         with open(log_file, "r") as file:
             output = file.read()
             if "error" in output.lower() or "failed" in output.lower():
                 print(f"Summary of {step}: Failed - see {log_file} for details.")
             else:
                 print(f"Summary of {step}: Success")
+
+
+def print_log(log_file):
+    with open(log_file, "r") as file:
+        lines = file.readlines()
+        error_lines = [
+            line
+            for line in lines
+            if "error" in line.lower() or "failed" in line.lower()
+        ]
+        if error_lines:
+            print("".join(error_lines))
+
+
+def print_log(log_file: str, keywords: list[str]):
+    with open(log_file, "r") as file:
+        lines = file.readlines()
+
+        for keyword in keywords:
+            # Filter lines that contain any of the keywords
+            error_lines = [line for line in lines if keyword in line]
+            if error_lines:
+                print("".join(error_lines))
 
 
 if __name__ == "__main__":
