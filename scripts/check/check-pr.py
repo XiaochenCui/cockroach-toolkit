@@ -101,10 +101,7 @@ def main(pr_number):
     bazel_config_dest = os.path.join(code_dir, os.path.basename(BAZEL_CONFIG))
     shutil.copy(BAZEL_CONFIG, bazel_config_dest)
 
-    # Step 4: Inject code
-    # code_inject(code_dir, log_dir)
-
-    # Step 5: Run the required commands
+    # Step 4: Run the required commands
     commands = {
         "doctor": "./dev doctor",
         "gen": "./dev gen",
@@ -123,7 +120,7 @@ def main(pr_number):
     else:
         print("All steps completed successfully.")
 
-    # Step 6: Summarize the output
+    # Step 5: Summarize the output
     for step, log_file in logs.items():
         match step:
             case "test":
@@ -170,10 +167,12 @@ def analyaze_test_log(log_file: str, keywords: list[str]):
 
         test_results = []
         for line in lines:
-            match = re.search(r'(?P<test_name>\S+).+PASSED in (?P<duration>\d+\.\ds)', line)
+            match = re.search(
+                r"(?P<test_name>\S+).+PASSED in (?P<duration>\d+\.\ds)", line
+            )
             if match:
                 test_name = match.group("test_name")
-                duration = float(match.group("duration").replace('s', ''))
+                duration = float(match.group("duration").replace("s", ""))
                 test_results.append((test_name, duration))
 
         # Sort the test results by duration in descending order
@@ -185,36 +184,6 @@ def analyaze_test_log(log_file: str, keywords: list[str]):
             print(f"{duration}s : {test_name}")
 
     print(f"=== log file <{log_file}> end ===")
-
-
-def insert_string_before_line(file_path, target_line_content, string_to_insert):
-    """
-    Inserts a string at the beginning of a line with the exact content match in a file.
-
-    Args:
-        file_path (str): The path to the file.
-        target_line_content (str): The exact content of the line where the string should be inserted before.
-        string_to_insert (str): The string to insert at the beginning of the specified line.
-    """
-    # Read the existing file content
-    with open(file_path, "r") as file:
-        lines = file.readlines()
-
-    # Find and modify the target line
-    modified = False
-    for i, line in enumerate(lines):
-        if line.strip() == target_line_content:
-            lines[i] = string_to_insert + "\n" + line
-            modified = True
-            break
-
-    if not modified:
-        print(f"Error: Line with content '{target_line_content}' not found.")
-        return
-
-    # Write the modified content back to the file
-    with open(file_path, "w") as file:
-        file.writelines(lines)
 
 
 if __name__ == "__main__":
