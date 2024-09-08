@@ -169,16 +169,6 @@ def analyaze_test_log(log_file: str, keywords: list[str]):
         print("number of <NO STATUS> tests:", len(no_status_lines))
 
         test_results = []
-
-        # lines = file.readlines()
-        # for line in lines:
-        #     re.match(r'^
-        #     match = re.search(r'PASSED in (\d+\.\ds)', line)
-        #     if match:
-        #         duration = float(match.group(1).replace('s', ''))
-        #         test_name = line.split('PASSED')[0].strip()
-        #         test_results.append((test_name, duration))
-        #     lines = file.readlines()
         for line in lines:
             match = re.search(r'(?P<test_name>\S+).+PASSED in (?P<duration>\d+\.\ds)', line)
             if match:
