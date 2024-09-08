@@ -15,6 +15,10 @@ cd $COCKROACH_SRC_DIR
 # remove scaffold files
 $TOOLKIT_DIR/scripts/debug/turn-debug.py off
 
+# ========================================
+# check the code style
+# ========================================
+
 # get the list of files that have been changed
 CHANGED_FILES=$(git diff --name-only upstream/master)
 
@@ -22,6 +26,14 @@ CHANGED_FILES=$(git diff --name-only upstream/master)
 CHANGED_FILES=$(echo $CHANGED_FILES | tr " " "\n" | grep "\.go$")
 
 gofmt -s -w $CHANGED_FILES
+
+go install github.com/cockroachdb/crlfmt
+
+crlfmt -w $CHANGED_FILES
+
+# ========================================
+# run the tests
+# ========================================
 
 # clear the output file
 echo "" > out
