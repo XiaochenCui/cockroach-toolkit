@@ -9,6 +9,7 @@
 # - ./dev test
 
 import os
+import re
 import sys
 import subprocess
 import shutil
@@ -22,7 +23,7 @@ BAZEL_CONFIG = os.path.expanduser("~/code/cockroach/.bazelrc.user")
 
 
 # Skip the actual command execution, only analyze the logs
-DRY_RUN = False
+DRY_RUN = True
 
 
 def run_command(command, log_file):
@@ -96,25 +97,24 @@ def main(pr_number):
         sys.exit(1)
 
     # Step 3: Copy Bazel config to the work dir
+    # The modification to "dev" package must happen before using the "./dev" command.
     bazel_config_dest = os.path.join(code_dir, os.path.basename(BAZEL_CONFIG))
     shutil.copy(BAZEL_CONFIG, bazel_config_dest)
 
-    # Step 4: Run the required commands
+    # Step 4: Inject code
+    # code_inject(code_dir, log_dir)
+
+    # Step 5: Run the required commands
     commands = {
         "doctor": "./dev doctor",
         "gen": "./dev gen",
         "lint": "./dev lint",
-        "test": "./dev test",
+        # "test": "./dev test",
+        "test": " ./dev test --timeout 10m -- --experimental_remote_cache_eviction_retries 3",
     }
 
     logs = {}
     for step, command in commands.items():
-        if step == "test":
-            target = """err := d.exec.CommandContextInheritingStdStreams(ctx, "bazel", args...)"""
-            insert = """args = append(args, "--experimental_remote_cache_eviction_retries=3")"""
-            file_path = os.path.join(code_dir, "pkg/cmd/dev/test.go")
-            insert_string_before_line(file_path, target, insert)
-
         log_file = f"{log_dir}/{step}.log"
         logs[step] = log_file
         if run_command(command, log_file) != 0:
@@ -123,7 +123,7 @@ def main(pr_number):
     else:
         print("All steps completed successfully.")
 
-    # Step 5: Summarize the output
+    # Step 6: Summarize the output
     for step, log_file in logs.items():
         match step:
             case "test":
@@ -134,6 +134,21 @@ def main(pr_number):
                 analyaze_test_log(log_file, keywords)
             case _:
                 continue
+
+
+def code_inject(code_dir: str, log_dir: str):
+    target = (
+        """err := d.exec.CommandContextInheritingStdStreams(ctx, "bazel", args...)"""
+    )
+    insert = """args = append(args, "--experimental_remote_cache_eviction_retries=3")"""
+    file_path = os.path.join(code_dir, "pkg/cmd/dev/test.go")
+    insert_string_before_line(file_path, target, insert)
+
+    command = "gofmt -s -w pkg/cmd/dev/test.go"
+    log_file = f"{log_dir}/gofmt.log"
+    if run_command(command, log_file) != 0:
+        print(f"Error: gofmt failed, see {log_file} for details.")
+        sys.exit(1)
 
 
 def analyaze_test_log(log_file: str, keywords: list[str]):
@@ -152,6 +167,32 @@ def analyaze_test_log(log_file: str, keywords: list[str]):
         print("=== NO STATUS ===")
         no_status_lines = [line for line in lines if "NO STATUS" in line]
         print("number of <NO STATUS> tests:", len(no_status_lines))
+
+        test_results = []
+
+        # lines = file.readlines()
+        # for line in lines:
+        #     re.match(r'^
+        #     match = re.search(r'PASSED in (\d+\.\ds)', line)
+        #     if match:
+        #         duration = float(match.group(1).replace('s', ''))
+        #         test_name = line.split('PASSED')[0].strip()
+        #         test_results.append((test_name, duration))
+        #     lines = file.readlines()
+        for line in lines:
+            match = re.search(r'(?P<test_name>\S+).+PASSED in (?P<duration>\d+\.\ds)', line)
+            if match:
+                test_name = match.group("test_name")
+                duration = float(match.group("duration").replace('s', ''))
+                test_results.append((test_name, duration))
+
+        # Sort the test results by duration in descending order
+        sorted_results = sorted(test_results, key=lambda x: x[1], reverse=True)
+
+        # Print the top 5 tests with the longest durations
+        print("Top 5 tests with the longest duration:")
+        for test_name, duration in sorted_results[:5]:
+            print(f"{duration}s : {test_name}")
 
     print(f"=== log file <{log_file}> end ===")
 
