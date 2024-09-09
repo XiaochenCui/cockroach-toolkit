@@ -29,7 +29,10 @@ gofmt -s -w $CHANGED_FILES
 
 go install github.com/cockroachdb/crlfmt
 
-crlfmt -w $CHANGED_FILES
+# "crlfmt" doesn't support multiple paths
+for file in $CHANGED_FILES; do
+  crlfmt -w $file
+done
 
 # ========================================
 # run the tests
