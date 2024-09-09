@@ -8,7 +8,7 @@ set -o nounset
 # set -o pipefail
 
 COCKROACH_SRC_DIR=$HOME/code/cockraoch
-TOOLKIT_DIR=$HOME/code/cookroach-toolkit
+TOOLKIT_DIR=$HOME/code/cockroach-toolkit
 
 cd $COCKROACH_SRC_DIR
 
