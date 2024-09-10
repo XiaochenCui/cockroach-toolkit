@@ -7,6 +7,7 @@
 
 
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -55,8 +56,27 @@ def identify_test(code_file: str, code_line: int) -> list[str]:
         kill_on_output="panic",
     )
 
+    # analyze the output to identify the test
+    # test example:
+    # github.com/cockroachdb/cockroach/pkg/kv/kvserver_test.TestStoreRangeUpReplicate(0xc00872c000)
+    # =>
+    # pkg/kv/kvserver:TestStoreRangeUpReplicate
+    test_pattern = re.compile(
+        r"github\.com/cockroachdb/cockroach/(pkg/.+)\.([A-Za-z0-9_]+)\("
+    )
+
+    tests = []
+    for match in test_pattern.finditer(output):
+        package_path = match.group(1)
+        test_name = match.group(2)
+        formatted_test = f"{package_path}:{test_name}"
+        tests.append(formatted_test)
+
     # print the count of lines in the output
     print(f"Output lines: {len(output.splitlines())}")
+
+    for test in tests:
+        print(test)
 
 
 def inject_code(code_file: str, code_line: int, injected_code: str):
