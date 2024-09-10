@@ -49,7 +49,8 @@ def identify_test(code_file: str, code_line: int) -> list[str]:
     output = run_command(
         f"./dev test {package_path}",
         output_file="/tmp/out",
-        stream_output=True,
+        # stream_output=True,
+        stream_output=False,
         kill_on_output="panic",
     )
 
@@ -67,7 +68,8 @@ def inject_code(code_file: str, code_line: int, injected_code: str):
         lines = f.readlines()
 
     # Return if the injected code is already present
-    if injected_code in lines:
+    output = "".join(lines)
+    if injected_code in output:
         return
 
     lines.insert(code_line - 1, injected_code)
@@ -114,7 +116,9 @@ def run_command(
     kill_event = threading.Event()
 
     def monitor_output():
-        while True:
+        while process.poll() is None:
+            # process is still running
+
             line = process.stdout.readline()
             if not line:
                 break
@@ -124,23 +128,26 @@ def run_command(
             if f:
                 f.write(line)  # Write output to the file in real-time
                 f.flush()  # Ensure the output is written immediately
-            if kill_on_output and kill_on_output in line:
-                kill_event.set()
+            if kill_on_output:
+                if kill_on_output in line:
+                    kill_event.set()
+
+    def control_process():
+        kill_event.wait()
+        process.kill()
 
     # Start monitoring the output in a separate thread
     thread = threading.Thread(target=monitor_output)
     thread.start()
 
-    if kill_on_output:
-        thread.join(1)  # Wait for the thread to finish or kill_event to be set
-        if kill_event.is_set():
-            process.kill()
-            thread.join()  # Ensure the thread finishes after killing the process
-    else:
-        thread.join()  # Wait for the thread to finish
+    # Start the control process in a separate thread
+    control_thread = threading.Thread(target=control_process)
+    control_thread.start()
+
+    thread.join()  # Wait for the thread to finish
+    control_thread.join()  # Wait for the control thread to finish
 
     process.wait()  # Ensure the process has terminated
-
     return "".join(output)
 
 
