@@ -41,6 +41,9 @@ done
 # clear the output file
 echo "" > out
 
+echo "running ./dev cache --reset" >> out
+./dev cache --reset 2>&1 | tee -a out
+
 echo "running ./dev gen" >> out
 ./dev gen 2>&1 | tee -a out
 
