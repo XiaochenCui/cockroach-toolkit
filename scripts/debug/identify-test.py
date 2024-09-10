@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 
 
 COCKROACH_ROOT = os.path.expanduser("~/code/cockroach")
@@ -134,6 +135,10 @@ def run_command(
 
     def control_process():
         kill_event.wait()
+
+        # sleep for 1 second for more output
+        time.sleep(1)
+
         process.kill()
 
     # Start monitoring the output in a separate thread
