@@ -13,7 +13,7 @@ TOOLKIT_DIR=$HOME/code/cockroach-toolkit
 cd $COCKROACH_SRC_DIR
 
 # remove scaffold files
-$TOOLKIT_DIR/scripts/debug/turn-debug.py off
+# $TOOLKIT_DIR/scripts/debug/turn-debug.py off
 
 # ========================================
 # check the code style
