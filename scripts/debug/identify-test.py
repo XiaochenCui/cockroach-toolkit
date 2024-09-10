@@ -62,13 +62,16 @@ def identify_test(code_file: str, code_line: int) -> list[str]:
     # =>
     # pkg/kv/kvserver:TestStoreRangeUpReplicate
     test_pattern = re.compile(
-        r"github\.com/cockroachdb/cockroach/(pkg/.+)\.([A-Za-z0-9_]+)\("
+        r"github\.com/cockroachdb/cockroach/(pkg/.+)\.(Test[A-Za-z0-9_]+)\("
     )
 
     tests = []
     for match in test_pattern.finditer(output):
         package_path = match.group(1)
         test_name = match.group(2)
+        if test_name == "TestMain":
+            continue
+
         formatted_test = f"{package_path}:{test_name}"
         tests.append(formatted_test)
 
