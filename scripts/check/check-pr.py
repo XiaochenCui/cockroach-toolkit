@@ -133,21 +133,6 @@ def main(pr_number):
                 continue
 
 
-def code_inject(code_dir: str, log_dir: str):
-    target = (
-        """err := d.exec.CommandContextInheritingStdStreams(ctx, "bazel", args...)"""
-    )
-    insert = """args = append(args, "--experimental_remote_cache_eviction_retries=3")"""
-    file_path = os.path.join(code_dir, "pkg/cmd/dev/test.go")
-    insert_string_before_line(file_path, target, insert)
-
-    command = "gofmt -s -w pkg/cmd/dev/test.go"
-    log_file = f"{log_dir}/gofmt.log"
-    if run_command(command, log_file) != 0:
-        print(f"Error: gofmt failed, see {log_file} for details.")
-        sys.exit(1)
-
-
 def analyaze_test_log(log_file: str, keywords: list[str]):
     print(f"=== log file <{log_file}> start ===")
     with open(log_file, "r") as file:
