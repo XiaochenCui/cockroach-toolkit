@@ -1,6 +1,6 @@
 publish:
 	git add --all
-	git commit -m "Update" || true
+	git commit -m "update" || true
 	git push
 
 	cd vscode/extension/optgen-vscode
