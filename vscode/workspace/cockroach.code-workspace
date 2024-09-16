@@ -8,6 +8,12 @@
 		},
 		{
 			"path": "../.."
+		},
+		{
+			"path": "../../../playground"
+		},
+		{
+			"path": "../../../pq"
 		}
 	],
 	"settings": {

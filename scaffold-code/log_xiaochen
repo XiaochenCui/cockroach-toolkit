@@ -1,4 +1,6 @@
 // target location: pkg/roachprod/logger/log_xiaochen.go
+//
+// we remove the extension of the file name so it will be ignored by the go compiler
 package logger
 
 import (
