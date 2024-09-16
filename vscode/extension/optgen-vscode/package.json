@@ -1,8 +1,8 @@
 {
-  "name": "optgen-vscode",
-  "displayName": "optgen-vscode",
-  "description": "",
-  "version": "0.0.1",
+  "name": "cockroachdb-dev-toolkit",
+  "displayName": "CockroachDB Dev Toolkit",
+  "description": "language support for optgen and testfiles",
+  "version": "0.1.2",
   "engines": {
     "vscode": "^1.84.0"
   },
