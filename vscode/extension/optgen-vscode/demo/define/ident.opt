@@ -1,0 +1,12 @@
+define IdentifierCI {
+    value string
+}
+
+define IdentifierCS {
+}
+
+[SQLNode, SimpleTableExpr]
+define TableName {
+    Name IdentifierCS
+    Qualifier IdentifierCS
+}

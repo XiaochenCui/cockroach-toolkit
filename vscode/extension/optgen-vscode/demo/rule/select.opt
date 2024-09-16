@@ -1,0 +1,597 @@
+# SlotEmbeding replace the column expr in select clause with the
+# exact value when the value is specified in the where clause.
+# 
+# e.g:
+# select a, b, c from table where a = 1 and b = 2
+# =>
+# select 1, 2, c from table where a = 1 and b = 2
+[SlotEmbeding, Normalize]
+(Select 
+    $distinct:*
+    $selectexprs:*
+    $from:*
+    $where:*
+    $groupby:*
+    $orderby:*
+    $limit:*
+        &
+        (Let ($slots $found):(FindSlots $where) $found)
+        &
+        (Let ($result_selectexprs $replaced):(ReplaceSlots $selectexprs $slots) $replaced)
+)
+=>
+(Select
+    $distinct
+    $result_selectexprs
+    $from
+    $where
+    $groupby
+    $orderby
+    $limit
+)
+
+# AdjustJoinSequence put the metatable at the left side of the join to simplify
+# the join logic
+[AdjustJoinSequence, Normalize]
+(JoinTableExpr
+    $left_expr:*
+        &
+        (Let ($left_table $_ $ok_1):(IsSingleTableQuery $left_expr) $ok_1)
+        &
+        ^(Let ($ok_2):(IsMetatable $left_table) $ok_2)
+    $join:"sqlparser.NormalJoinType"
+    $right_expr:*
+        &
+        (Let ($right_table $_ $ok_3):(IsSingleTableQuery $right_expr) $ok_3)
+        &
+        (Let ($ok_4):(IsMetatable $right_table) $ok_4)
+    $condition:*
+)
+=>
+(JoinTableExpr
+    $right_expr
+    $join
+    $left_expr
+    $condition
+)
+
+# StripLimitOnAgg strip the limit clause from aggregate query if the limit is not needed.
+# 
+# e.g:
+# select count(*) from table limit 10
+# =>
+# select count(*) from table
+[StripLimitOnAgg, Normalize]
+(Select
+    $distinct:*
+    $selectexprs:(ContainsAggregate $selectexprs)
+    $from:*
+    $where:*
+    $groupby:"nil"
+    $orderby:*
+    $limit:
+        ^(IsNil $limit)
+        &
+        (Limit
+                $offset:(EqualToZero $offset)
+                $row_count:(GreaterThanZero $row_count)
+        )
+)
+=>
+(Select
+    $distinct
+    $selectexprs
+    $from
+    $where
+    $groupby
+    $orderby
+    "nil"
+)
+
+# RemoveUnnecessaryAgg remove the aggregate function if the aggregate function is not needed.
+#
+# e.g:
+# SELECT count(*) FROM table LIMIT 10, 10
+# =>
+# SELECT 0 FROM table LIMIT 0, 0
+[RemoveUnnecessaryAgg, Normalize]
+(Select
+    $distinct:*
+    $selectexprs:(ContainsAggregate $selectexprs)
+    $from:*
+    $where:*
+    $groupby:"nil"
+    $orderby:*
+    $limit:
+        ^(IsNil $limit)
+        &
+        (Limit
+                $offset:(GreaterThanZero $offset)
+        )
+)
+=>
+(Select
+    $distinct
+    (PhantomSelect)
+    $from
+    $where
+    $groupby
+    $orderby
+    (Limit
+        "0"
+        "0"
+    )
+)
+
+# RemoveUnnecessaryAgg_1 remove the aggregate function if the aggregate function is not needed.
+#
+# e.g:
+# SELECT count(*) FROM table LIMIT 0
+# =>
+# SELECT 0 FROM table LIMIT 0, 0
+[RemoveUnnecessaryAgg_1, Normalize]
+(Select
+    $distinct:*
+    $selectexprs:(ContainsAggregate $selectexprs)
+    $from:*
+    $where:*
+    $groupby:"nil"
+    $orderby:*
+    $limit:
+        ^(IsNil $limit)
+        &
+        (Limit
+                $_:*
+                $count:(EqualToZero $count)
+        )
+)
+=>
+(Select
+    $distinct
+    (PhantomSelect)
+    $from
+    $where
+    $groupby
+    $orderby
+    (Limit
+        "0"
+        "0"
+    )
+)
+
+# StripOrderOnAgg strip the order by clause from the query if the query
+# contains an aggregate function, because the order by clause is not needed
+# in this case.
+# 
+# e.g:
+#
+#	SELECT Count(*)
+#	FROM   table
+#	WHERE  ...
+#	ORDER  BY ...
+# ==>
+#	SELECT Count(*)
+#	FROM   table
+#	WHERE  ...
+[StripOrderOnAgg, Normalize]
+(Select
+    $distinct:*
+    $selectexprs:(ContainsAggregate $selectexprs)
+    $from:*
+    $where:*
+    $groupby:"nil"
+    $orderby:^(IsNil $orderby)
+    $limit:*
+)
+=>
+(Select
+    $distinct
+    $selectexprs
+    $from
+    $where
+    "nil"
+    "nil"
+    $limit
+)
+
+# StratifyAggregate stratify the aggregate expressions in the computation to a
+# stand-alone layer.
+#
+# e.g:
+# SELECT foo(sum(a)) FROM table
+# =>
+# SELECT foo(agg_0)
+# FROM (SELECT sum(a) AS agg_0
+#       FROM table) AS t
+[StratifyAggregate, Normalize]
+(Select
+    $distinct:*
+    $selectexprs:(ContainsWrappedAggregate $selectexprs)
+    $from:*
+    $where:*
+    $groupby:*
+    $orderby:*
+    $limit:*
+        &
+        (Let ($insideExprs $outsideExprs $stratified):(StratifyAggregate $selectexprs) $stratified)
+        &
+        (Let ($tableName $ok):(GetVirtualTable) $ok)
+)
+=>
+(Select
+    $distinct
+    (UpdateTableName $outsideExprs $tableName)
+    [
+        (AliasedTableExpr
+            (DerivedTable
+                (Select
+                    $distinct
+                    $insideExprs
+                    $from
+                    $where
+                    $groupby
+                    "nil"
+                    "nil"
+                )
+            )
+            $tableName
+        )
+    ]
+    "nil"
+    "nil"
+    $orderby
+    $limit
+)
+
+# StratifyJoinAggregate stratify aggregate logic to a stand-alone layer
+# for aggregate + join query.
+# 
+# e.g:
+# SELECT sum(a)
+# FROM table1
+#   JOIN table2
+#       ON table1.id = table2.id
+# =>
+# SELECT sum(agg_arg_0)
+# FROM (SELECT a AS agg_arg_0
+#       FROM table1
+#         JOIN table2
+#             ON table1.id = table2.id) AS t
+# 
+# old comments (to be tidied up):
+# // RuleStratifyAggregate stratify aggregate logic to a stand-alone layer
+# // for following cases:
+# //
+# //   - aggregate function in the "SELECT" clause of a join query
+# //
+# //   - aggregate function in the "SELECT" clause of a "brute-forage-aggregate" single table query
+# //
+# //   - aggregate function in the "SELECT" clause of a "pinpoint-aggregate" single table query
+[StratifyJoinAggregate, Normalize]
+(Select
+    $distinct:*
+    $selectexprs:(ContainsAggregate $selectexprs)
+    $from:[
+            $join:(JoinTableExpr)
+        ]
+    $where:*
+    $groupby:*
+    $orderby:*
+    $limit:*
+        &
+        (Let ($insideExprs $outsideExprs $stripped):(StripAggQuery $selectexprs $from) $stripped)
+        &
+        (Let ($tableName $ok):(GetVirtualTable) $ok)
+)
+=>
+(Select
+    $distinct
+    (UpdateTableName $outsideExprs $tableName)
+    [
+        (AliasedTableExpr
+            (DerivedTable
+                (Select
+                    $distinct
+                    $insideExprs
+                    $from
+                    $where
+                    $groupby
+                    "nil"
+                    "nil"
+                )
+            )
+            $tableName
+        )
+    ]
+    "nil"
+    "nil"
+    $orderby
+    $limit
+)
+
+# StratifyBruteForceAggregate stratify aggregate logic for brute-force-aggregate and
+# pinpoint-aggregate
+# 
+# e.g:
+# SELECT sum(a)
+# FROM table1
+# WHERE a > 10
+# =>
+# SELECT sum(agg_arg_0)
+# FROM (SELECT a AS agg_arg_0
+#       FROM table1
+#       WHERE a > 10) AS t
+# 
+# TODO: rewrite this rule after new-syntax is supported
+[StratifyBruteForceAggregate, Normalize]
+(Select
+    $distinct:*
+    $selectexprs:*
+    $from:[
+            (AliasedTableExpr
+                $expr:(TableName)
+                $_:*
+            )
+        ]
+    $where:*
+    $groupby:*
+    $orderby:*
+    $limit:*
+        &
+        (Let ($isBruteForceAgg):(IsBruteForceAgg $selectexprs $from $where $groupby) $isBruteForceAgg)
+        &
+        (Let ($insideExprs $outsideExprs $stripped):(StripAggQuery $selectexprs $from) $stripped)
+        &
+        (Let ($tableName $ok):(GetVirtualTable) $ok)
+)
+=>
+(Select
+    $distinct
+    (UpdateTableName $outsideExprs $tableName)
+    [
+        (AliasedTableExpr
+            (DerivedTable
+                (Select
+                    "false"
+                    $insideExprs
+                    $from
+                    $where
+                    "nil"
+                    "nil"
+                    "nil"
+                )
+            )
+            $tableName
+        )
+    ]
+    "nil"
+    (UpdateTableName2 $groupby $tableName)
+    $orderby
+    $limit
+)
+
+# AddMissingExprs add missing exprs to the child query to satisfy the 
+# "GROUP BY"/"HAVING"/"ORDER BY" clause of the parent query.
+#
+# e.g:
+# SELECT a
+# FROM (SELECT a FROM table) AS t
+# GROUP BY b
+# HAVING c > 10
+# ORDER BY d
+# =>
+# SELECT a
+# FROM (SELECT a, b, c, d FROM table) AS t
+# GROUP BY b
+# HAVING c > 10
+# ORDER BY d
+[AddMissingExprs, Normalize]
+(Select
+    $distinct:*
+    $selectexprs:*
+    $from:[
+            (AliasedTableExpr
+                $expr:(DerivedTable
+                    (Select
+                        *
+                        $innerExprs:*
+                        $innerFrom:*
+                        $innerWhere:*
+                        $innerGroupby:*
+                        $innerOrderby:*
+                        $innerLimit:*
+                    )
+                )
+                $tableName:*
+            )
+        ]
+    $where:*
+    $groupby:*
+    $orderby:*
+    $limit:*
+        &
+        (Let ($missingExprs $ok):(GetMissingColumns $innerExprs $groupby $orderby) $ok)
+)
+=>
+(Select
+    $distinct
+    $selectexprs
+    [
+        (AliasedTableExpr
+            (DerivedTable
+                (Select
+                    "false"
+                    (AppendColumns $innerExprs $missingExprs)
+                    $innerFrom
+                    $innerWhere
+                    $innerGroupby
+                    $innerOrderby
+                    $innerLimit
+                )
+            )
+            $tableName
+        )
+    ]
+    $where
+    $groupby
+    $orderby
+    $limit
+)
+
+# # UnifyAggregateWindow unify the aggregate window query to a standarized form.
+# #
+# # e.g:
+# # SELECT last(spd)
+# # FROM   kudu_gb32960_test v
+# # =>
+# # SELECT last(spd)
+# # FROM   kudu_gb32960_test v
+# # WHERE  e_t_date BETWEEN '2019-01-01 00:00:00' AND '2019-01-01 23:59:59'
+# # GROUP  BY aggregate_window(e_t_date, '1h', true)
+# [UnifyAggregateWindow, Normalize]
+# (Select
+#     $selectexprs:*
+#     $from:*
+#     $where:*
+#     $groupby:"nil"
+#     $orderby:*
+#     $limit:*
+#         &
+#         (Let ($ok):(IsAggregateWindowQuery $selectexprs $from $where $groupby) $ok)
+# )
+# =>
+# (Select
+#     $selectexprs
+#     $from
+#     (Where
+#         $where
+#         (And
+#             (GreaterOrEqual
+#                 $expr:(ColumnExpr
+#                     $column:(ColumnName "e_t_date")
+#                 )
+#                 $value:(StringLiteral "2019-01-01 00:00:00")
+#             )
+#             (LessOrEqual
+#                 $expr:(ColumnExpr
+#                     $column:(ColumnName "e_t_date")
+#                 )
+#                 $value:(StringLiteral "2019-01-01 23:59:59")
+#             )
+#         )
+#     )
+#     (GroupBy
+#         (AggregateWindow
+#             $expr:(ColumnExpr
+#                 $column:(ColumnName "e_t_date")
+#             )
+#             $interval:(StringLiteral "1h")
+#             $ignoreFractions:(BooleanLiteral true)
+#         )
+#     )
+#     $orderby
+#     $limit
+# )
+
+[RemoveRedundantColumns, Normalize]
+(
+    DerivedTable
+        (Select
+            $distinct:*
+            $exprs:*
+            $from:*
+            $where:*
+            $groupby:*
+            $orderby:*
+            $limit:*
+                &
+                (Let ($result_selectexprs $ok):(RemoveRedundant $exprs) $ok)
+        )
+)
+=>
+(DerivedTable
+    (Select
+        $distinct
+        $result_selectexprs
+        $from
+        $where
+        $groupby
+        $orderby
+        $limit
+    )
+)
+
+# ExpandStar expands the star expression to a list of columns.
+[ExpandStar, Normalize]
+(Select
+    $selectexprs:(ContainsStar $selectexprs)
+    $from:*
+)
+=>
+(Select
+    SelectExprs = (ExpandStarExpr $selectexprs (GetColumns $from))
+    From = $from
+)
+
+# [ExprPushDown, Normalize]
+# (Select
+#     $selectexprs:*
+#     $from:(
+#             $join:(JoinTableExpr)
+#         )
+#     $where:*
+#     $groupby:*
+#     $orderby:*
+# )
+# =>
+# (Select
+#     $selectexprs
+#     $from
+#     $where
+#     $groupby
+#     $orderby
+# )
+
+# AddTableName add the table name to the column name if the column name is not
+# qualified.
+[AddTableName, Normalize]
+(Select
+    $selectexprs:*
+    $from:*
+    $where:*
+    $groupby:*
+    $orderby:*
+        &
+        (ContainsUnqualifiedColumn $selectexprs $from $where $groupby $orderby)
+        &
+        (AddTableName $selectexprs $from)
+        &
+        (AddTableName $from $from)
+        &
+        (AddTableName $where $from)
+        &
+        (AddTableName $groupby $from)
+        &
+        (AddTableName $orderby $from)
+)
+=>
+(Select
+    SelectExprs = $selectexprs
+    From = $from
+    Where = $where
+    GroupBy = $groupby
+    OrderBy = $orderby
+)
+
+# StratifySort stratify the sort logic to a stand-alone layer.
+#
+# e.g:
+# SELECT from_unixtime(e_t) AS e_t
+# FROM table
+# ORDER BY e_t
+# =>
+# SELECT vtable_1.e_t
+# FROM (
+#   SELECT from_unixtime(e_t) AS e_t
+#   FROM table ) vtable_1
+# ORDER BY vtable_1.e_t

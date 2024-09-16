@@ -1,0 +1,50 @@
+# AlignTableName align the table name to the same case as the actual table name in the database
+# 
+# e.g:
+# SELECT USERINFO.username
+# FROM dataBASE.userINFO
+# =>
+# SELECT UserInfo.username
+# FROM dataBASE.UserInfo
+# (if the actual table name in the database is UserInfo)
+[AlignTableName, Normalize]
+(TableName
+    $name:*
+        &
+        (Let ($aligned $changed):(AlignTableName $name) $changed)
+)
+=>
+(TableName
+    Name = $aligned
+)
+
+# AlignColumnName align the column name to the same case as the actual column name in the database
+#
+# e.g:
+# SELECT userinfo.USERNAME
+# FROM userinfo
+# =>
+# SELECT userinfo.UserName
+# FROM userinfo
+# (if the actual column name in the database is UserName)
+[AlignColumnName, Normalize]
+(ColName
+    $name:*
+        &
+        (Let ($aligned $changed):(AlignColumnName $name) $changed)
+)
+=>
+(ColName
+    Name = $aligned
+)
+
+# [LowerAliasedExpr, Normalize]
+# (AliasedExpr
+#     $as:*
+#         &
+#         (Let ($lowered $changed):(Lower $as) $changed)
+# )
+# =>
+# (AliasedExpr
+#     As = $lowered
+# )

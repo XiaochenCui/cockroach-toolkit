@@ -1,0 +1,126 @@
+# relational.opt contains Optgen language definitions for all of Lightning's
+# physical and logical operators that return a table-valued result having rows
+# and columns (i.e. relational). Many of them correspond to operators in the
+# relational algebra, but there are also variants that are useful for concisely
+# and incrementally expressing transformations.
+#
+# Tags
+#
+# Relational - All operators in this file are marked with the Relational tag,
+#              so they can be easily distinguished from Scalar and Enforcer
+#              operators.
+#
+# Join - All join operators (inner, left, right, full, semi, anti), as well as
+#        their JoinApply variants, are marked with the Join tag, which allows
+#        any of them to fulfill a Join pattern match.
+#
+# JoinApply - All join apply operators are marked with the JoinApply tag.
+#             Unlike standard Join operators, JoinApply operators allow the
+#             right input to refer to columns projected by the left input.
+#             Allowing this is useful as an intermediate (or sometimes final)
+#             step in some important transformations (like eliminating
+#             subqueries).
+
+# Select filters rows from its input result set, based on the boolean filter
+# predicate expression. Rows which do not match the filter are discarded. While
+# the Filter operand can be any boolean expression, normalization rules will
+# typically convert it to a Filters operator in order to make conjunction list
+# matching easier.
+[SQLNode, Relational, SelectStatement]
+define Select {
+    Distinct bool
+    SelectExprs SelectExprs
+    From TableExprs
+    Where Where
+    GroupBy GroupBy
+    OrderBy OrderBy
+    Limit Limit
+}
+
+[SQLNode, List]
+define SelectExprs {
+}
+
+[SQLNode, List]
+define TableExprs {
+}
+
+[SQLNode]
+define Where {
+    Expr Expr
+}
+
+[SQLNode]
+define Limit {
+    Offset Expr
+    Rowcount Expr
+}
+
+[SQLNode, TableExpr]
+define JoinTableExpr {
+    LeftExpr TableExpr
+    Join JoinType
+    RightExpr TableExpr
+    Condition JoinCondition
+}
+
+[SQLNode]
+define JoinCondition {
+    On Expr
+    Using Columns
+}
+
+[SQLNode, List]
+define Columns {
+}
+
+[SQLNode, TableExpr]
+define AliasedTableExpr {
+    Expr SimpleTableExpr
+    As IdentifierCS
+}
+
+[SQLNode, SimpleTableExpr]
+define DerivedTable {
+    Select SelectStatement
+}
+
+[SQLNode, List]
+define GroupBy {
+}
+
+[SQLNode, List]
+define OrderBy {
+}
+
+[SQLNode]
+define Order {
+    Expr Expr
+    Direction OrderDirection
+}
+
+[List]
+define Whens {
+}
+
+[SQLNode]
+define When {
+    Cond Expr
+    Val Expr
+}
+
+# TODO: remove this
+[Private]
+define PhantomCell {
+}
+
+[SQLNode, List]
+define Exprs {
+}
+
+[SQLNode]
+define ConvertType {
+    Type    string
+	Length  Literal
+	Scale   Literal
+}

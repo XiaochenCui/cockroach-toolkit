@@ -1,0 +1,51 @@
+# SimplifyTrueAnd simplifies the And operator by discarding a True condition on
+# the left side.
+[SimplifyTrueAnd, Normalize]
+(And (True) $right:*)
+=>
+$right
+
+# SimplifyAndTrue simplifies the And operator by discarding a True condition on
+# the right side.
+[SimplifyAndTrue, Normalize]
+(And $left:* (True))
+=>
+$left
+
+# SimplifyFalseAnd maps the And operator to False if its left input is False.
+[SimplifyFalseAnd, Normalize]
+(And $left:(False) *)
+=>
+$left
+
+# SimplifyAndFalse maps the And operator to False if its right input is False.
+[SimplifyAndFalse, Normalize]
+(And * $right:(False))
+=>
+$right
+
+# SimplifyTrueOr maps the Or operator to True if its left input is True.
+[SimplifyTrueOr, Normalize]
+(Or $left:(True) *)
+=>
+$left
+
+# SimplifyOrTrue maps the Or operator to True if its right input is True.
+[SimplifyOrTrue, Normalize]
+(Or * $right:(True))
+=>
+$right
+
+# SimplifyFalseOr simplifies the Or operator by discarding a False condition on
+# the left side.
+[SimplifyFalseOr, Normalize]
+(Or (False) $right:*)
+=>
+$right
+
+# SimplifyOrFalse simplifies the Or operator by discarding a False condition on
+# the right side.
+[SimplifyOrFalse, Normalize]
+(Or $left:* (False))
+=>
+$left

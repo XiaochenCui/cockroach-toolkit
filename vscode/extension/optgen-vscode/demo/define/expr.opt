@@ -1,0 +1,323 @@
+# And is the boolean conjunction operator that evaluates to true only if both of
+# its conditions evaluate to true.
+[SQLNode, Expr, Bool]
+define And {
+    Left Expr
+    Right Expr
+}
+
+# Or is the boolean disjunction operator that evaluates to true if either of its
+# conditions evaluate to true.
+[SQLNode, Expr, Bool]
+define Or {
+    Left Expr
+    Right Expr
+}
+
+[SQLNode, Expr, Bool]
+define Not {
+    Expr Expr
+}
+
+[SQLNode, Expr, Bool]
+define Xor {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Bool, ConstValue]
+define True {
+}
+
+[Expr, Bool, ConstValue]
+define False {
+}
+
+[Expr, Bool, Comparison]
+define Regexp {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Bool, Comparison]
+define NotRegexp {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Bool, Comparison]
+define Equal {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Bool, Comparison]
+define NotEqual {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Bool, Comparison]
+define LessEqual {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Bool, Comparison]
+define LessThan {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Bool, Comparison]
+define GreaterEqual {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Bool, Comparison]
+define GreaterThan {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Bool, Comparison]
+define Like {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Bool, Comparison]
+define NotLike {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Bool, Comparison]
+define In {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Bool, Comparison]
+define NotIn {
+    Left Expr
+    Right Expr
+}
+
+[SQLNode, Expr]
+define Case {
+    Expr Expr
+    Whens Whens
+    Else Expr
+}
+
+[Expr, Binary]
+define Plus {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Binary]
+define Minus {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Binary]
+define Mult {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Binary]
+define Div {
+    Left Expr
+    Right Expr
+}
+
+[Expr, Binary]
+define Mod {
+    Left Expr
+    Right Expr
+}
+ 
+# Function invokes a builtin SQL function like CONCAT or NOW, passing the given
+# arguments. The FunctionPrivate field contains the name of the function as well
+# as pointers to its type and properties.
+[SQLNode, Expr]
+define Func {
+    Name IdentifierCI
+    Exprs SelectExprs
+}
+
+[SQLNode, Expr]
+define IntervalFuncExpr {
+    Expr Expr
+    Exprs Exprs
+}
+
+[Expr, Bool, Between]
+define Between {
+    Left Expr
+    From Expr
+    To Expr
+}
+
+[Expr, Bool, Between]
+define NotBetween {
+    Left Expr
+    From Expr
+    To Expr
+}
+
+# TODO: remove this
+[SQLNode, Expr]
+define CountStar {
+    _ PhantomCell
+}
+
+[SQLNode, Expr]
+define ColName {
+    Name IdentifierCI
+    Qualifier TableName
+}
+
+[SQLNode, Expr]
+define Bool {
+}
+
+[SQLNode, Expr]
+define Literal {
+    Type ValType
+    Val string
+}
+
+[SQLNode, Expr]
+define Max {
+    Arg Expr
+}
+
+[SQLNode, Expr]
+define Min {
+    Arg Expr
+}
+
+[SQLNode, Expr]
+define Sum {
+    Arg Expr
+}
+
+[SQLNode, Expr]
+define Avg {
+    Arg Expr
+}
+
+[SQLNode, Expr]
+define Count {
+    Args Exprs
+}
+
+[SQLNode, Expr]
+define Std {
+    Arg Expr
+}
+
+[SQLNode, Expr]
+define StdDev {
+    Arg Expr
+}
+
+[SQLNode, Expr]
+define StdPop {
+    Arg Expr
+}
+
+[SQLNode, Expr]
+define StdSamp {
+    Arg Expr
+}
+
+[SQLNode, Expr] 
+define VarPop {
+    Arg Expr
+}
+
+[SQLNode, Expr]
+define VarSamp {
+    Arg Expr
+}
+
+[SQLNode, Expr] 
+define Variance {
+    Arg Expr
+}
+
+[SQLNode, Expr]
+define CurTimeFuncExpr {
+    Name IdentifierCI
+}
+
+[SQLNode, Expr]
+define Unary {
+    Operator UnaryExprOperator
+    Expr Expr
+}
+
+# "Parent" means a node have children types.
+[SQLNode, Expr, Parent]
+define ComparisonExpr {
+    Operator ComparisonExprOperator
+    Left Expr
+    Right Expr
+}
+
+[SQLNode, Expr, Parent]
+define BetweenExpr {
+    IsBetween bool
+    Left Expr
+    From Expr
+    To Expr
+}
+
+[SQLNode, Expr, Parent]
+define BinaryExpr {
+    Operator BinaryExprOperator
+    Left Expr
+    Right Expr
+}
+
+# IsExpr represents an IS ... or an IS NOT ... expression.
+[SQLNode, Expr]
+define IsExpr {
+    Left Expr
+    Right IsExprOperator
+}
+
+# ValTuple represents a tuple of actual values.
+[SQLNode, Expr, List]
+define ValTuple {
+}
+
+[SQLNode, Expr]
+define Variable {
+    Scope Scope
+    Name  IdentifierCI
+}
+
+[SQLNode, Expr]
+define NullVal {
+}
+
+[SQLNode, Expr] 
+define SubstrExpr {
+    Name Expr
+    From Expr
+    To Expr
+}
+
+[SQLNode, Expr]
+define ConvertExpr {
+    Expr Expr
+	Type ConvertType
+}

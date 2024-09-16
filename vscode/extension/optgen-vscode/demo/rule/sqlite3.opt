@@ -1,0 +1,12 @@
+# concat(a, b, c)
+# =>
+# a || b || c
+
+
+# e_t >= 'time_string'
+# =>
+# e_t >= unixepoch('time_string', 'utc')
+
+# from_unixtime('unix_seconds'),
+# =>
+# datetime('unix_seconds', 'unixepoch', 'localtime'),

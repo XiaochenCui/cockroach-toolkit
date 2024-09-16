@@ -1,0 +1,294 @@
+# CommuteVar ensures that variable references are on the left side of
+# commutative comparison and binary operators. Other patterns don't need to
+# handle both combinations.
+[CommuteVar, Normalize]
+(Equal | NotEqual | Plus | Mult | And | Or
+    $left:(Let ($_ $ok_1):(IsLiteral $left) $ok_1)
+    $right:^(Let ($_ $ok_2):(IsLiteral $right) $ok_2)
+)
+=>
+((OpName) $right $left)
+
+# EvalExpr evaluates expressions that are constant at compile time.
+[EvalFunctionExpr, Normalize]
+(Func
+    $name:*
+    $args:* &
+        (Let ($result $ok):(FoldFunctionExpr $name $args) $ok)
+)
+=>
+$result
+
+# EvalBinaryExpr evaluates binary expressions that are constant at compile time.
+[EvalBinaryExpr, Normalize]
+(Plus | Minus | Mult | Div | Mod
+    $left:*
+    $right:* &
+        (Let ($result $ok):(FoldBinaryExpr (OpName) $left $right) $ok)
+)
+=>
+$result
+
+
+[RewriteNullComparison, Normalize]
+(GreaterEqual | GreaterThan | LessThan | LessEqual | NotEqual | Equal
+    $left:*
+    $right:*
+        &
+        (Let ($_ $ok):(IsNullVal $right) $ok)
+) => 
+(ConstructFalse)
+
+# DismantleBetween dismantles Between expressions into a pair of comparisons.
+[DismantleBetween, Normalize]
+(Between $left:* $from:* $to:*)
+=>
+(And
+    (GreaterEqual $left $from)
+    (LessEqual $left $to)
+)
+
+# DismantleNotBetween dismantles NotBetween expressions into a pair of comparisons.
+[DismantleNotBetween, Normalize]
+(NotBetween $left:* $from:* $to:*)
+=>
+(Or
+    (LessThan $left $from)
+    (GreaterThan $left $to)
+)
+
+# LowerFunctionName normalizes function names to lower case.
+[LowerFunctionName, Normalize]
+(Func $name:* $args:* &
+    (Let ($result $ok):(Lower $name) $ok)
+)
+=>
+(Func $result $args)
+
+# RewriteUnaryExpr rewrites an unary expressions to a mult expression.
+[RewriteUnaryExpr, Normalize]
+(Unary $operator:* $expr:*)
+=>
+(Mult "-1" $expr)
+
+# RewriteTimeLike rewrites time-like expressions to a combination of
+# time comparisons.
+#
+# e.g:
+# time like '2021-%'
+# =>
+# time >= '2021-01-01 00:00:00' and time < '2022-01-01 00:00:00'
+[RewriteTimeLike, Normalize]
+(Like 
+    $left:(IsPrimaryTime $left)
+    $expr:* 
+        &
+        (Let ($start $end $ok):(GetTimeRange $expr) $ok)
+)
+=>
+(And
+    (GreaterEqual $left $start)
+    (LessThan $left $end)
+)
+
+# RewriteTimeNotLike rewrites time-not-like expressions to a combination of
+# time comparisons.
+#
+# e.g:
+# time not like '2021-%'
+# =>
+# time < '2021-01-01 00:00:00' or time >= '2022-01-01 00:00:00'
+[RewriteTimeNotLike, Normalize]
+(NotLike 
+    $left:(IsPrimaryTime $left)
+    $expr:* 
+        &
+        (Let ($start $end $ok):(GetTimeRange $expr) $ok)
+)
+=>
+(Or
+    (LessThan $left $start)
+    (GreaterEqual $left $end)
+)
+
+# TODO: rename this rule
+[RewriteTimeReleventET, Normalize]
+(Equal
+    $left:(Let ($accuracy $ok1):(IsPrimaryTimeRelevent $left) $ok1)
+    $expr:* 
+        &
+        (Let ($start $end $ok):(FuzzyTimeToRange $expr $accuracy) $ok)
+)
+=>
+(And
+    (LessEqual $left $end)
+    (GreaterEqual $left $start)
+)
+
+# UnifyTimeFormat unifies time formats to a single format (RFC3339ToNanosecondTZ).
+# This rule only apply to bool expression.
+#
+# e.g:
+# time >= '2021-11-01 00:00:00'
+# =>
+# time >= '2021-11-01T00:00:00+0800'
+# 
+# time >= '2021-11-01 00:00:00.123'
+# =>
+# time >= '2021-11-01T00:00:00.123+0800'
+[UnifyTimeFormat, Normalize]
+(Comparison
+    $left:*
+        &
+        (Let ($is_time_column):(IsTimeColumn $left) $is_time_column)
+    $right:*
+        &
+        (Let ($result $ok):(UnifyTimeFormat $right) $ok)
+)
+=>
+((OpName) $left $result)
+
+# UnifyPrimaryTime unifies "TimeColRelevant" column to "PrimaryTime" column
+# in where clause.
+#
+# e.g:
+# e_t > '2021-11-01 00:00:00'
+# =>
+# e_t_date > '2021-11-01 00:00:00'
+[UnifyPrimaryTime, Normalize]
+(LessEqual | LessThan | GreaterEqual | GreaterThan
+    $left:* 
+        &
+        (Let ($primary_time $ok):(ToPrimaryTime $left) $ok)
+    $right:(Let ($_ $ok_2):(IsLiteral $right) $ok_2)
+)
+=>
+((OpName) $primary_time $right)
+
+# StripeFunc_FromUnixTime transforms from_unixtime function to a time column.
+#
+# e.g:
+# from_unixtime(e_t) > '2021-11-01 00:00:00'
+# =>
+# e_t_date > '2021-11-01 00:00:00
+[StripeFunc_FromUnixTime, Normalize]
+(Comparison
+    $left:
+    (Func
+        $name:"from_unixtime" 
+        $exprs:[
+            $item:(AliasedExpr
+                    $expr:*
+                    *
+                )
+            ]
+            &
+            (Let ($primary_time $ok):(ToPrimaryTime $expr) $ok)
+    )
+    $right:*
+)
+=>
+((OpName) $primary_time $right)
+
+# StripeFunc_Date transforms date function to a time column.
+#
+# e.g:
+# date(e_t_date) > '2021-11-01 00:00:00'
+# =>
+# e_t_date > '2021-11-01 00:00:00'
+[StripeFunc_Date, Normalize]
+(Comparison
+    $left:
+    (Func
+        $name:"date" 
+        $exprs:[
+            $item:(AliasedExpr
+                    $expr:*
+                    *
+                )
+            ]
+            &
+            (Let ($ok):(IsPrimaryTime $expr) $ok)
+    )
+    $right:*
+)
+=>
+((OpName) $expr $right)
+
+# Count Rewrite
+# 
+# - For single table query, rewrite count(*) to count(primary key), so agg func will have at least one arg.
+# 
+# SQL standards: (from mysql)
+# - `COUNT(*)` will count all the rows in the table, including `NULL` values
+# - `COUNT(column name)` will count all the rows in the specified column while excluding `NULL` values.
+# - `COUNT(*)` and `COUNT(1)` are precisely the same. They are precisely the same because the value in the COUNT() parentheses serves only to tell the query what it will count. (other arguments are the same, e.g: `COUNT(-123)`, `COUNT('hello, world')`
+# - `COUNT()` doesn’t work
+# 
+# Ref:
+# - https://www.educative.io/answers/how-to-use-the-count-function-in-mysql
+# - https://learnsql.com/blog/difference-between-count-distinct/
+# 
+# TODO: rewrite "count()" on join query
+
+# count(*)
+# =>
+# count(primary_key)
+[RewriteCountStar_0, Normalize]
+(
+    CountStar
+        (Let ($is_single_table):(InsideSingleTableQuery) $is_single_table)
+        &
+        (Let ($primary_key $ok):(GetPrimaryKey) $ok)
+)
+=>
+(Count
+    [
+        $primary_key
+    ]
+)
+
+# count(*)
+# =>
+# count('1')
+[RewriteCountStar_1, Normalize]
+(
+    CountStar
+        ^(Let ($_ $ok):(GetPrimaryKey) $ok)
+)
+=>
+(Count
+    [
+        "1"
+    ]
+)
+
+# count(1, 2, 3)
+# =>
+# count(primary_key)
+[RewriteCount, Normalize]
+(
+    Count $args:*
+        &
+        (Let ($result $ok):(UnifyCount $args) $ok)
+)
+=>
+(Count
+    [
+        $result
+    ]
+)
+
+# last_row(expr) -> last(expr, false, true)
+[RewriteLastRow, Normalize]
+(Func 
+    $name:*
+    $args:*
+        &
+        (Let ($result $nonNil $ok):(IsFirstLastFunc $name $args) $ok)  
+)
+=>
+(Func
+    (ConstructIdentifierCI $result)
+    (ConstructLastFuncArgs $args $nonNil)
+)

@@ -1,0 +1,12 @@
+# AliasedExpr is an expression that has an alias attached to it.
+[SQLNode, SelectExpr]
+define AliasedExpr {
+    Expr Expr
+    As IdentifierCI
+}
+
+# StarExpr is a star expression.
+[SQLNode, SelectExpr]
+define StarExpr {
+    TableName TableName
+}
