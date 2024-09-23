@@ -14,6 +14,9 @@
 		},
 		{
 			"path": "../../../pq"
+		},
+		{
+			"path": "../../../vscode-copy-github-link"
 		}
 	],
 	"settings": {
@@ -24,6 +27,7 @@
 			// for gofmt, "-s" means to simplify code
 			"-s",
 		],
+		"yash.YYTYPE": "",
 	},
 	"extensions": {
 		"recommendations": [

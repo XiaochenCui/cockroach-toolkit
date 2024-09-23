@@ -26,20 +26,25 @@ BAZEL_CONFIG = os.path.expanduser("~/code/cockroach/.bazelrc.user")
 DRY_RUN = True
 
 
-def run_command(command, log_file):
+def run_command(command, log_file) -> int:
+    """
+    Run a command and write the output (stdout and stderr) to a log file, return the exit code.
+
+    The log file will be created if it doesn't exist, and will be overwritten if it does.
+    """
     if DRY_RUN:
         print(f"DRY_RUN: {command}")
         return 0
 
     start_time = time.time()
-    print(f"Running command: {command}, log file: {log_file}")
+    print(f"running command: {command}, log file: {log_file}")
     with open(log_file, "w") as file:
         process = subprocess.Popen(
             command, shell=True, stdout=file, stderr=subprocess.STDOUT
         )
         process.communicate()
     duration = time.time() - start_time
-    print(f"Command finished in {duration:.2f} seconds.")
+    print(f"command finished in {duration:.2f} seconds.")
     return process.returncode
 
 
