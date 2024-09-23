@@ -7,6 +7,7 @@
 # - ./dev lint
 # - ./dev test
 
+import io
 import os
 import re
 from typing import Tuple
@@ -35,14 +36,10 @@ def format_code():
     Format the Go code in the changed files.
     """
     # get the list of files that have been changed
-    changed_files_output, exit_code = run_command(
-        "git diff --name-only upstream/master"
+    output, _ = xiaochen_py.run_command(
+        "git diff --name-only upstream/master", stream_output=False, slient=True
     )
-    xiaochen_py.run_command("git diff --name-only upstream/master")
-    if exit_code != 0:
-        raise Exception("failed to get the list of changed files")
-
-    changed_files = changed_files_output.decode("utf-8").strip().split("\n")
+    changed_files = output.decode().strip().split("\n")
 
     # filter out the files that are not go files
     changed_go_files = [file for file in changed_files if file.endswith(".go")]
@@ -52,28 +49,32 @@ def format_code():
         return
 
     # run gofmt
-    run_command(f"gofmt -s -w {' '.join(changed_go_files)}")
+    xiaochen_py.run_command(
+        f"gofmt -s -w {' '.join(changed_go_files)}", stream_output=False, slient=True
+    )
 
     # install crlfmt
-    run_command("go install github.com/cockroachdb/crlfmt")
+    xiaochen_py.run_command(
+        "go install github.com/cockroachdb/crlfmt", stream_output=False, slient=True
+    )
 
     # run crlfmt on each Go file
     for file in changed_go_files:
-        run_command(f"crlfmt -w {file}")
+        xiaochen_py.run_command(f"crlfmt -w {file}", stream_output=False, slient=True)
 
 
 def gen():
     """
     Run `./dev gen` and check the result.
     """
-    output, exit_code = run_command("./dev gen", log_path="gen.log")
+    output, exit_code = xiaochen_py.run_command("./dev gen", log_path="gen.log")
 
 
 def lint():
     """
     Run `./dev lint` and check the result.
     """
-    output, exit_code = run_command("./dev lint", log_path="lint.log")
+    output, exit_code = xiaochen_py.run_command("./dev lint", log_path="lint.log")
 
 
 def test():
@@ -82,18 +83,32 @@ def test():
     """
     log_path = "test.log"
 
-    output, exit_code = run_command("./dev test", log_path=log_path)
+    while True:
+        output, exit_code = xiaochen_py.run_command("./dev test", log_path=log_path)
 
+        if cache_miss_found(output):
+            logging.info("cache miss found, run ./dev cache --reset")
+            xiaochen_py.run_command(
+                "./dev cache --reset", stream_output=False, log_path="cache_reset.log"
+            )
+            continue
+
+        analyaze_test_log(log_path)
+
+
+def cache_miss_found(output: bytes) -> bool:
+    cache_miss_error = "Failed to fetch blobs because they do not exist remotely."
+    return cache_miss_error in output.decode()
+
+
+def analyaze_test_log(log_path: str, keywords: list[str]):
     keywords = [
         "ERROR",
         "FAILED TO BUILD",
     ]
-    analyaze_test_log(log_path, keywords)
 
-
-def analyaze_test_log(log_file: str, keywords: list[str]):
-    print(f"=== log file <{log_file}> start ===")
-    with open(log_file, "r") as file:
+    print(f"=== log file <{log_path}> start ===")
+    with open(log_path, "r") as file:
         lines = file.readlines()
 
         for keyword in keywords:
@@ -126,7 +141,7 @@ def analyaze_test_log(log_file: str, keywords: list[str]):
         for test_name, duration in sorted_results[:5]:
             print(f"{duration}s : {test_name}")
 
-    print(f"=== log file <{log_file}> end ===")
+    print(f"=== log file <{log_path}> end ===")
 
 
 if __name__ == "__main__":

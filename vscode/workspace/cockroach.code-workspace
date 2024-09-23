@@ -57,6 +57,13 @@
 				// the current file
 				"program": "${file}",
 			},
+			{
+				"name": "(py) run current file",
+				"type": "debugpy",
+				"request": "launch",
+				// the current file
+				"program": "${file}",
+			},
 		]
 	},
 }
