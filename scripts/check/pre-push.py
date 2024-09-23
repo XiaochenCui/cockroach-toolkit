@@ -10,6 +10,7 @@
 import io
 import os
 import re
+import sys
 from typing import Tuple
 import subprocess
 import time
@@ -92,8 +93,10 @@ def test():
                 "./dev cache --reset", stream_output=False, log_path="cache_reset.log"
             )
             continue
+        else:
+            break
 
-        analyaze_test_log(log_path)
+    analyaze_test_log(log_path)
 
 
 def cache_miss_found(output: bytes) -> bool:
@@ -101,27 +104,36 @@ def cache_miss_found(output: bytes) -> bool:
     return cache_miss_error in output.decode()
 
 
-def analyaze_test_log(log_path: str, keywords: list[str]):
+def analyaze_test_log(log_path: str):
     keywords = [
+        "--- FAIL",
         "ERROR",
         "FAILED TO BUILD",
     ]
 
-    print(f"=== log file <{log_path}> start ===")
+    test_summary = open("test-analyze.log", "w")
+
+    xiaochen_py.tee_print(
+        f"=== log file <{log_path}> start ===", [sys.stdout, test_summary]
+    )
+
     with open(log_path, "r") as file:
         lines = file.readlines()
 
         for keyword in keywords:
-            print(f"=== {keyword} ===")
+            xiaochen_py.tee_print(f"=== {keyword} ===", [sys.stdout, test_summary])
             # Filter lines that contain any of the keywords
             error_lines = [line for line in lines if keyword in line]
             if error_lines:
-                print("".join(error_lines))
+                xiaochen_py.tee_print("".join(error_lines), [sys.stdout, test_summary])
 
         # get the number of lines that contain "NO STATUS"
-        print("=== NO STATUS ===")
+        xiaochen_py.tee_print("=== NO STATUS ===", [sys.stdout, test_summary])
         no_status_lines = [line for line in lines if "NO STATUS" in line]
-        print("number of <NO STATUS> tests:", len(no_status_lines))
+        xiaochen_py.tee_print(
+            f"number of <NO STATUS> tests: {len(no_status_lines)}",
+            [sys.stdout, test_summary],
+        )
 
         test_results = []
         for line in lines:
@@ -137,12 +149,15 @@ def analyaze_test_log(log_path: str, keywords: list[str]):
         sorted_results = sorted(test_results, key=lambda x: x[1], reverse=True)
 
         # Print the top 5 tests with the longest durations
-        print("Top 5 tests with the longest duration:")
+        xiaochen_py.tee_print(
+            "Top 5 tests with the longest duration:", [sys.stdout, test_summary]
+        )
         for test_name, duration in sorted_results[:5]:
-            print(f"{duration}s : {test_name}")
+            xiaochen_py.tee_print(f"{duration}s : {test_name}", [sys.stdout, test_summary])
 
-    print(f"=== log file <{log_path}> end ===")
+    xiaochen_py.tee_print(f"=== log file <{log_path}> end ===", [sys.stdout, test_summary])
 
 
 if __name__ == "__main__":
+    # xiaochen_py.DRY_RUN = True
     run()
