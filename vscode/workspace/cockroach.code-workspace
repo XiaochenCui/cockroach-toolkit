@@ -17,6 +17,9 @@
 		},
 		{
 			"path": "../../../vscode-copy-github-link"
+		},
+		{
+			"path": "../../../terminal-toolkit"
 		}
 	],
 	"settings": {
@@ -27,7 +30,8 @@
 			// for gofmt, "-s" means to simplify code
 			"-s",
 		],
-		"yash.YYTYPE": "",
+		// read environment variables from this file
+		"python.envFile": "${workspaceFolder}/vscode/.env",
 	},
 	"extensions": {
 		"recommendations": [
@@ -50,7 +54,7 @@
 				"type": "go",
 				"request": "launch",
 				"mode": "auto",
-				// current file
+				// the current file
 				"program": "${file}",
 			},
 		]

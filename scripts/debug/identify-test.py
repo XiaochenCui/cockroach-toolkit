@@ -12,6 +12,7 @@ import subprocess
 import sys
 import threading
 import time
+from typing import Tuple
 
 
 COCKROACH_ROOT = os.path.expanduser("~/code/cockroach")
@@ -102,26 +103,30 @@ def inject_code(code_file: str, code_line: int, injected_code: str):
         f.write("".join(lines))
 
 
+from typing import Tuple, Optional
+
+
 def run_command(
     command: str,
     include_stderr: bool = True,
-    output_file: str = None,
+    output_file: Optional[str] = None,
     stream_output: bool = False,
-    kill_on_output: str = None,
-) -> str:
+    kill_on_output: Optional[str] = None,
+) -> Tuple[str, int]:
     """
-    Run a shell command and return its output.
+    Run a shell command and return its output and exit code.
 
     Args:
-    - command: The shell command to run.
-    - include_stderr: Whether to include stderr in the output.
-    - output_file: The file to write the output to in real-time, if it's not None.
-                   If the file doesn't exist, it will be created. If it does exist, it will be overwritten.
-    - stream_output: Whether to stream the output to stdout.
-    - kill_on_output: If this string is found in the output, kill the process after 1 second.
+        command (str): The shell command to execute.
+        include_stderr (bool, optional): If True, stderr is included in the output. Defaults to True.
+        output_file (Optional[str], optional): The file path where output will be written in real-time. If None, no file is written.
+                                               If the file exists, it will be overwritten. Defaults to None.
+        stream_output (bool, optional): If True, streams the output to stdout while executing. Defaults to False.
+        kill_on_output (Optional[str], optional): If the given string is found in the output, the process will be killed after 1 second.
+                                                 Defaults to None.
 
     Returns:
-    - The output of the command as a string.
+        Tuple[str, int]: A tuple containing the output of the command as a string and the exit code of the process.
     """
     f = None
     if output_file:

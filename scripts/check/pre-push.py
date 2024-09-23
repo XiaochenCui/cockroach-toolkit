@@ -13,6 +13,7 @@ from typing import Tuple
 import subprocess
 import time
 import logging
+import xiaochen_py
 
 COCKROACH_SRC_DIR = os.path.expanduser("~/code/cockroach")
 
@@ -37,6 +38,7 @@ def format_code():
     changed_files_output, exit_code = run_command(
         "git diff --name-only upstream/master"
     )
+    xiaochen_py.run_command("git diff --name-only upstream/master")
     if exit_code != 0:
         raise Exception("failed to get the list of changed files")
 
@@ -87,40 +89,6 @@ def test():
         "FAILED TO BUILD",
     ]
     analyaze_test_log(log_path, keywords)
-
-
-def run_command(command, log_path=None, raise_on_failure=True) -> Tuple[bytes, int]:
-    """
-    Run a command and write the output (stdout and stderr) to a log file, return the exit code and output (as bytes).
-
-    The log file will be created if it doesn't exist, and will be overwritten if it does.
-
-    If the log_file is None, the output will not be written to a file.
-    """
-    start_time = time.time()
-    logging.info(f"start command: {command}, log file: {log_path}")
-    process = subprocess.Popen(
-        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    )
-    output, _ = process.communicate()
-    if log_path:
-        with open(log_path, "wb") as output_file:
-            output_file.write(output)
-    duration = time.time() - start_time
-    logging.info(f"command completed in {duration:.2f} seconds")
-
-    if process.returncode != 0:
-        logging.info(f"command failed with exit code {process.returncode}")
-        if raise_on_failure:
-            logging.info(
-                f"command {command} failed with exit code {process.returncode}"
-            )
-            logging.info(f"output: {output.decode('utf-8')}")
-            raise Exception(
-                f"command {command} failed with exit code {process.returncode}"
-            )
-
-    return output, process.returncode
 
 
 def analyaze_test_log(log_file: str, keywords: list[str]):
