@@ -8,6 +8,7 @@
 # - ./dev test
 
 import os
+import re
 from typing import Tuple
 import subprocess
 import time
@@ -19,6 +20,9 @@ COCKROACH_SRC_DIR = os.path.expanduser("~/code/cockroach")
 def run():
     goto_src_dir()
     format_code()
+    gen()
+    lint()
+    test()
 
 
 def goto_src_dir():
