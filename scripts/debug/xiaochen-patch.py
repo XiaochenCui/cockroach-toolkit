@@ -48,14 +48,16 @@ def patch_file(file_path, mode: str):
             shutil.copy(file_path, target_location)
             print(f"File copied to {target_location}")
         case "off":
-            os.remove(target_location)
-            print(f"File removed from {target_location}")
+            if os.path.exists(target_location):
+                os.remove(target_location)
+                print(f"File removed from {target_location}")
 
 
 def toggle_enterprise_license_check(mode: str):
     target_path = os.path.join(COCKROACH_SRC_PATH, "pkg/ccl/utilccl/license_check.go")
 
-    patch = "return nil"
+    # we add special comments to the patch to make it distinguishable
+    patch = "return nil /* xiaochen-patch */"
     origin = "return checkEnterpriseEnabledAt(st, timeutil.Now(), feature, true /* withDetails */)"
 
     match mode:

@@ -76,6 +76,8 @@ def lint():
     Run `./dev lint` and check the result.
     """
     output, exit_code = xiaochen_py.run_command("./dev lint", log_path="lint.log")
+    if exit_code != 0:
+        logging.error("lint failed")
 
 
 def test():
@@ -153,9 +155,13 @@ def analyaze_test_log(log_path: str):
             "Top 5 tests with the longest duration:", [sys.stdout, test_summary]
         )
         for test_name, duration in sorted_results[:5]:
-            xiaochen_py.tee_print(f"{duration}s : {test_name}", [sys.stdout, test_summary])
+            xiaochen_py.tee_print(
+                f"{duration}s : {test_name}", [sys.stdout, test_summary]
+            )
 
-    xiaochen_py.tee_print(f"=== log file <{log_path}> end ===", [sys.stdout, test_summary])
+    xiaochen_py.tee_print(
+        f"=== log file <{log_path}> end ===", [sys.stdout, test_summary]
+    )
 
 
 if __name__ == "__main__":
