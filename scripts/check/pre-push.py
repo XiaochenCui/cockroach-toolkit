@@ -87,7 +87,9 @@ def test():
     log_path = "test.log"
 
     while True:
-        output, exit_code = xiaochen_py.run_command("./dev test", log_path=log_path)
+        output, exit_code = xiaochen_py.run_command(
+            "./dev test", log_path=log_path, raise_on_failure=False
+        )
 
         if cache_miss_found(output):
             logging.info("cache miss found, run ./dev cache --reset")
